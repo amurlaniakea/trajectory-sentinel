@@ -16,3 +16,7 @@ jobs:
       - run: ruff format --check .
       - run: pytest
       - run: bandit -r src -ll
+      - name: gitleaks (secret scan)
+        uses: gitleaks/gitleaks-action@v2
+        env:
+          GITLEAKS_ENABLE_UPLOAD_ARTIFACT: "false"
