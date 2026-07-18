@@ -1,0 +1,23 @@
+# Secrets / credenciales — NUNCA commitear
+.env
+*.key
+*.pem
+credentials/
+.hermes/
+.gnupg/
+.aws/
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+venv/
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+build/
+dist/
+*.egg-info/
+
+# CI outputs
+.gitleaks/

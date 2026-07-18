@@ -1,0 +1,31 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "trajectory-sentinel"
+version = "0.1.0"
+description = "Monitor unificado que orquesta senales de adi-shield, wallet-guard, goal-anchor y memlineage."
+readme = "README.md"
+requires-python = ">=3.11"
+license = { text = "AGPL-3.0-or-later" }
+authors = [{ name = "Pedro Sordo Martínez (amurlaniakea@gmail.com)" }]
+dependencies = []
+
+[project.optional-dependencies]
+dev = ["ruff", "pytest", "bandit", "gitleaks"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B", "S", "C4"]
+ignore = []
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"
+
+[tool.bandit]
+skips = ["B101"]
