@@ -17,6 +17,11 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <https://www.gnu.org/licenses/>.
 
-def test_scaffold_placeholder() -> None:
-    """Scaffold; falla a proposito hasta implementar el MVP."""
-    raise NotImplementedError
+"""trajectory-sentinel core."""
+
+
+class Placeholder:
+    """Scaffold; la implementacion de defensa va aqui (fase de codigo)."""
+
+    def __init__(self) -> None:
+        self.ready = False
