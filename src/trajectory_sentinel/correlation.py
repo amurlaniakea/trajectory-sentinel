@@ -74,11 +74,13 @@ def correlate(signals: list[dict]) -> CorrelatedVerdict:
     verdicts = {s["sensor"]: s.get("verdict", "allow") for s in signals}
     # El bus de adi-shield NO tiene campo 'mechanism'; usa 'event' y 'detail'.
     # goal-anchor publica Signal(event="drift", detail="drift:soft_X"/"drift:alert").
-    # Aceptamos ambos: event == "drift" O detail conteniendo 'drift'/'semantic'.
+    # La deriva se detecta ESTRICTAMENTE por event == "drift" (no por substring
+    # del detail, para no colisionar con eventos de retractacion).
     def _is_drift(sig: dict) -> bool:
-        ev = sig.get("event", "")
-        det = sig.get("detail", "")
-        return (ev == "drift") or ("drift" in det) or ("semantic" in det)
+        # Comprobacion ESTRICTA por evento, no por substring del detail (punto 4
+        # de auditoria: 'drift' en detail hacia que drift_retract tambien
+        # contara como deriva). El evento del bus es el campo canonico.
+        return sig.get("event") == "drift"
 
     # 1. cualquier block/kill corta
     for s in signals:

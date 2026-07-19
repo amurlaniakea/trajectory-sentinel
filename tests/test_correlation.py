@@ -101,7 +101,7 @@ def test_drift_retract_reviews_correlated_verdict():
         {"sensor": "goal-anchor", "verdict": "confirm", "event": "drift",
          "detail": "drift:alert_soft_0.5"},
         {"sensor": "goal-anchor", "verdict": "allow", "event": "drift_retract",
-         "detail": "drift_retract:verify:hitos=[2]"},
+         "detail": "retract:drift:verify:hitos=[2]"},
     ])
     assert v2.verdict == "allow"
     assert v2.mechanism == "correlation:drift_retracted"

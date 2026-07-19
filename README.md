@@ -43,13 +43,23 @@ de correlación, incl. retractación) y `tests/test_integration_drift.py` (E2E
 bus real: DriftMonitor → Signal → TrajectorySentinel, incl. ampliación tardía
 que retracta y revisa la correlación).
 
-**Gap HONESTO que queda:** la correlación depende de que goal-anchor emita la
+**Gap HONESTO que queda:** la correlación depende de que goal-anchor emite la
 señal de deriva. Hasta que la Capa 2 de goal-anchor tenga un backend semántico
 real operacional, la deriva semántica sutil (T1/T2/T4) no llega como señal a
 trajectory-sentinel, así que la regla `correlation:drift_despite_allows` no se
 dispara para esos casos. Es decir: el ecosistema completo cierra el vector
 WebTrap BRUSCO hoy, pero el WebTrap SUTIL requiere el embedder semántico real
 en Capa 2 (trabajo posterior acordado, documentado, no oculto).
+
+**Gap conocido de retractación (2026-07-19):** `ga_retracted` es un booleano
+por tarea, no por sub-objetivo. Si dos sub-objetivos distintos tienen deriva
+simultánea y SOLO uno se retracta, la correlación baja a `allow` para TODA la
+tarea, silenciando también la alerta del sub-objetivo sin resolver. La señal
+`drift_retract` ya lleva el sub-objetivo en su `detail`
+(`retract:drift:<sub>:hitos=[...]`), pero `correlation.py` hoy no lo usa para
+retractar selectivamente. El corpus actual solo prueba un sub-objetivo en
+deriva a la vez, así que no se manifiesta; queda anotado para cerrar cuando
+haya casos reales de amenazas concurrentes.
 
 ## Instalación
 

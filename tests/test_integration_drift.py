@@ -29,10 +29,11 @@ import pytest
 adi_shield = pytest.importorskip("adi_shield")
 goal_anchor = pytest.importorskip("goal_anchor")
 from adi_shield.bus import LocalSignalBus, Signal
-from goal_anchor.anchor import GoalAnchor, AnchorProposal
+from goal_anchor.anchor import AnchorProposal, GoalAnchor
 from goal_anchor.drift import DriftMonitor
-from trajectory_sentinel.correlation import correlate
+
 from trajectory_sentinel.monitor import TrajectorySentinel
+
 
 def _adi_signal(task_id: str, verdict: str, detail: str) -> Signal:
     return Signal(sensor="adi-shield", task_id=task_id, event="tool_call",
@@ -104,13 +105,19 @@ def test_end_to_end_amplification_late_retracts_and_reviews_correlation(tmp_path
     ga.confirm(anchor)  # confirm inicial
 
     # el agente reporta un hito fuera de ancla (ampliacion no ha llegado)
-    ga.report_drift("t-ret", "iii_transitive", "verify")
+    drift_sig = ga.report_drift("t-ret", "iii_transitive", "verify")
+    assert drift_sig is not None
+    # la alerta original SE DERIVA del código real (no simulada): el DriftSignal
+    # de report_drift se traduce a Signal del bus con to_signal()
+    alert_signal = drift_sig.to_signal("t-ret")
+    assert alert_signal is not None
+    assert alert_signal.event == "drift"
+    assert alert_signal.verdict == "confirm"
 
     bus = LocalSignalBus()
     sentinel = TrajectorySentinel(bus)
-    # publicamos las senales al bus (el monitor se suscribe)
-    bus.publish(Signal(sensor="goal-anchor", task_id="t-ret", event="drift",
-                       verdict="confirm", detail="drift:alert_soft_0.5"))
+    # publicamos la senal REAL de deriva al bus (el monitor se suscribe)
+    bus.publish(alert_signal)
     bus.publish(_adi_signal("t-ret", "allow", "cross_boundary"))
     before = sentinel.report("t-ret")
     assert before is not None
