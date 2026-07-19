@@ -18,14 +18,32 @@ Este MVP es un **observador del bus**, no un router ni un correlador agregado:
   sin promediar la confianza a ciegas (cumple SDD R4).
 - Expone `report` / `summarize` para revisión humana.
 
-## Gap conocido (NO implementado en este MVP)
+## Estado de correlación agregada (2026-07-19, implementado)
 
 El SDD promete **correlación agregada de 2+ vectores** (AC1: cruzar las señales
-de los sensores para detectar ataques que ninguno ve solo). Ese mecanismo
-**aún no existe** en el código: `trajectory-sentinel` hoy solo registra y
-jerarquiza señales individuales por tarea. Es un MVP honesto de la fase de
-observador, no del correlador. Queda pendiente como trabajo posterior antes
-de declararlo cobertura completa del SDD.
+de los sensores para detectar ataques que ninguno ve solo). Estado actual:
+
+**IMPLEMENTADO:** `src/trajectory_sentinel/correlation.py` —
+`CorrelationEngine` determnista que cruza las señales de una tarea
+(adi-shield, wallet-guard, goal-anchor) y emite un veredicto agregado por
+CORRELACIÓN, no solo worst-verdict. Reglas (0-LLM, deterministas):
+- cualquier `block`/`kill` corta (worst-verdict ya lo haría, se hace explícito);
+- `goal-anchor` reporta deriva (mechanism contiene `drift`/`semantic`) MIENTRAS
+  los demás dan `allow` → escala a `confirm` agregado (caso WebTrap que solo el
+  ancla ve, p.ej. T1/T2/T4 de goal-anchor donde adi-shield/wallet-guard pasan);
+- ≥2 sensores en `confirm` simultáneo → `confirm` agregado (ambigüedad acumulada).
+
+El `TrajectoryRecord.to_dict()` ya incluye la clave `correlated` con el
+veredicto correlacionado por tarea. Tests: `tests/test_correlation.py` (6 casos
+de correlación).
+
+**Gap HONESTO que queda:** la correlación depende de que goal-anchor emita la
+señal de deriva. Hasta que la Capa 2 de goal-anchor tenga un backend semántico
+real operacional, la deriva semántica sutil (T1/T2/T4) no llega como señal a
+trajectory-sentinel, así que la regla `correlation:drift_despite_allows` no se
+dispara para esos casos. Es decir: el ecosistema completo cierra el vector
+WebTrap BRUSCO hoy, pero el WebTrap SUTIL requiere el embedder semántico real
+en Capa 2 (trabajo posterior acordado, documentado, no oculto).
 
 ## Instalación
 
