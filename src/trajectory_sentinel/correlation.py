@@ -32,9 +32,36 @@ y testeables.
 
 from __future__ import annotations
 
+import re
+from collections.abc import Callable
 from dataclasses import dataclass
 
 SEVERITY = {"allow": 0, "confirm": 1, "block": 2, "kill": 3}
+
+
+class SensorCalibration:
+    """Calibración por sensor (SDD trajectory-sentinel R4).
+
+    El campo `confidence` de cada sensor es un score BRUTO, no comparable
+    entre sensores (0.7 de adi-shield != 0.7 de goal-anchor). Antes de
+    combinar scores para un KILL agregado, hay que normalizar por sensor
+    con curvas de calibración empíricas sobre benchmark. Esto evita el
+    promedio naïf que el SDD prohíbe explícitamente.
+
+    Por defecto (sin curva) es identidad: la calibración es OPCIONAL y no
+    cambia el comportamiento actual (que usa worst-verdict, no KILL agregado
+    por score). Se activa pasando curvas cuando se implemente KILL agregado.
+    """
+
+    def __init__(self, curves: dict[str, Callable] | None = None) -> None:
+        # curves[sensor] = fn(score_bruto) -> score_calibrado en [0,1]
+        self._curves = curves or {}
+
+    def calibrate(self, sensor: str, raw: float) -> float:
+        fn = self._curves.get(sensor)
+        if fn is None:
+            return max(0.0, min(1.0, raw))  # identidad por defecto
+        return max(0.0, min(1.0, fn(raw)))
 
 
 @dataclass
@@ -70,7 +97,6 @@ def correlate(signals: list[dict]) -> CorrelatedVerdict:
     if not signals:
         return CorrelatedVerdict("allow", "no_signals", "sin señales que correlar")
 
-    sensors = {s["sensor"]: s for s in signals}
     verdicts = {s["sensor"]: s.get("verdict", "allow") for s in signals}
     # El bus de adi-shield NO tiene campo 'mechanism'; usa 'event' y 'detail'.
     # goal-anchor publica Signal(event="drift", detail="drift:soft_X"/"drift:alert").
@@ -91,30 +117,44 @@ def correlate(signals: list[dict]) -> CorrelatedVerdict:
             )
 
     # 2. goal-anchor deriva mientras otros allow
-    ga = sensors.get("goal-anchor")
-    ga_retracted = any(
-        sig.get("event") == "drift_retract" and sig.get("sensor") == "goal-anchor"
-        for sig in signals
-    )
+    # P5: puede haber DOS señales de goal-anchor (drift + drift_retract).
+    # Usamos la señal de DRIFT específica (event=="drift"), no la última del
+    # dict colapsado, para no perder la deriva cuando también hay retract.
+    ga_signals = [s for s in signals if s.get("sensor") == "goal-anchor"]
+    ga = next((s for s in ga_signals if s.get("event") == "drift"), None)
+    # Subs retractados por autorización humana tardía (P5): retractación
+    # SELECTIVA por sub-objetivo, no por tarea completa.
+    retracted_subs = set()
+    for sig in ga_signals:
+        if sig.get("event") == "drift_retract":
+            det = sig.get("detail", "")
+            # formato: retract:drift:<sub>:hitos=[...]
+            m = re.search(r"retract:drift:([^:]+):", det)
+            if m:
+                retracted_subs.add(m.group(1))
     if ga is not None:
         ga_is_drift = _is_drift(ga)
         others = [v for k, v in verdicts.items() if k != "goal-anchor"]
         others_all_allow = others and all(v == "allow" for v in others)
-        if ga_is_drift and others_all_allow and not ga_retracted:
+        # sub que derivó (del detail de la señal de deriva)
+        drift_sub = ""
+        gm = re.search(r":sub=([^:\s]+)", ga.get("detail", ""))
+        if gm:
+            drift_sub = gm.group(1)
+        if ga_is_drift and others_all_allow:
+            if drift_sub and drift_sub in retracted_subs:
+                # solo este sub fue autorizado retroactivamente -> la deriva
+                # de ESTE sub se perdona, pero QUEDA REGISTRO (no se oculta).
+                return CorrelatedVerdict(
+                    "allow", "correlation:drift_retracted",
+                    f"goal-anchor retractó la deriva del sub '{drift_sub}' "
+                    f"(autorización humana tardía): correlación revisa y baja a allow",
+                )
+            # deriva de un sub NO retractado (o sin sub conocido) -> confirm
             return CorrelatedVerdict(
                 "confirm", "correlation:drift_despite_allows",
                 "goal-anchor detecta deriva pero adi-shield/wallet-guard dan allow: "
                 "ataque WebTrap que solo el ancla ve -> atención humana",
-            )
-        # matiz del usuario: si goal-anchor retractó (event=drift_retract), la
-        # correlación no queda congelada con la lectura vieja. La deriva previa
-        # fue autorizada retroactivamente por el humano -> baja a allow, pero
-        # QUEDA REGISTRO de que hubo retractación (no se oculta al auditor).
-        if ga_retracted and others_all_allow:
-            return CorrelatedVerdict(
-                "allow", "correlation:drift_retracted",
-                "goal-anchor retractó la deriva (autorización humana tardía): "
-                "correlación revisa su veredicto y baja a allow",
             )
 
     # 3. >=2 sensores en confirm simultáneo

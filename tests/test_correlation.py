@@ -92,16 +92,46 @@ def test_drift_retract_reviews_correlated_verdict():
     ])
     assert v.verdict == "confirm"
     assert v.mechanism == "correlation:drift_despite_allows"
-    # llega la retractacion
+    # llega la retractacion del sub 'verify'
     v2 = correlate([
         {"sensor": "adi-shield", "verdict": "allow", "event": "tool_call",
          "detail": "cross_boundary"},
         {"sensor": "wallet-guard", "verdict": "allow", "event": "tool_call",
          "detail": "budget_ok"},
         {"sensor": "goal-anchor", "verdict": "confirm", "event": "drift",
-         "detail": "drift:alert_soft_0.5"},
+         "detail": "drift:alert_soft_0.5:sub=verify"},
         {"sensor": "goal-anchor", "verdict": "allow", "event": "drift_retract",
          "detail": "retract:drift:verify:hitos=[2]"},
     ])
     assert v2.verdict == "allow"
     assert v2.mechanism == "correlation:drift_retracted"
+
+
+def test_drift_retract_selective_by_subobjective():
+    # Dos subs en deriva; solo UNO se retracta -> la tarea sigue en confirm
+    # (la deriva del sub NO retractado persiste). P5.
+    v = correlate([
+        {"sensor": "adi-shield", "verdict": "allow", "event": "tool_call",
+         "detail": "cross_boundary"},
+        {"sensor": "wallet-guard", "verdict": "allow", "event": "tool_call",
+         "detail": "budget_ok"},
+        {"sensor": "goal-anchor", "verdict": "confirm", "event": "drift",
+         "detail": "drift:alert_soft_0.6:sub=pay_attacker"},
+        {"sensor": "goal-anchor", "verdict": "allow", "event": "drift_retract",
+         "detail": "retract:drift:verify:hitos=[2]"},
+    ])
+    assert v.verdict == "confirm"
+    assert v.mechanism == "correlation:drift_despite_allows"
+
+
+
+def test_sensor_calibration_identity_by_default():
+    # P2 (SDD R4): calibración por sensor. Sin curva -> identidad (no cambia
+    # el score). Con curva -> normaliza. Evita promedio naïf entre sensores.
+    from trajectory_sentinel.correlation import SensorCalibration
+    cal = SensorCalibration()
+    assert cal.calibrate("adi-shield", 0.7) == 0.7
+    assert cal.calibrate("goal-anchor", 1.4) == 1.0  # clamp a [0,1]
+    cal2 = SensorCalibration(curves={"adi-shield": lambda x: x * 0.5})
+    assert cal2.calibrate("adi-shield", 0.8) == 0.4
+    assert cal2.calibrate("goal-anchor", 0.8) == 0.8  # sin curva -> idéntico
