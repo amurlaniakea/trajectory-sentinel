@@ -37,6 +37,8 @@ from typing import Any
 
 from adi_shield.bus import LocalSignalBus, Signal
 
+from trajectory_sentinel.correlation import correlate
+
 SEVERITY = {"allow": 0, "confirm": 1, "block": 2, "kill": 3}
 
 
@@ -53,6 +55,8 @@ class TrajectoryRecord:
             "worst_verdict": self.worst_verdict,
             "per_sensor": self.per_sensor,
             "signal_count": len(self.signals),
+            "correlated": correlate([s.to_dict() for s in self.signals]).to_dict()
+            if self.signals else None,
             "signals": [s.to_dict() for s in self.signals],
         }
 
