@@ -90,15 +90,29 @@ def correlate(signals: list[dict]) -> CorrelatedVerdict:
 
     # 2. goal-anchor deriva mientras otros allow
     ga = sensors.get("goal-anchor")
+    ga_retracted = any(
+        sig.get("event") == "drift_retract" and sig.get("sensor") == "goal-anchor"
+        for sig in signals
+    )
     if ga is not None:
         ga_is_drift = _is_drift(ga)
         others = [v for k, v in verdicts.items() if k != "goal-anchor"]
         others_all_allow = others and all(v == "allow" for v in others)
-        if ga_is_drift and others_all_allow:
+        if ga_is_drift and others_all_allow and not ga_retracted:
             return CorrelatedVerdict(
                 "confirm", "correlation:drift_despite_allows",
                 "goal-anchor detecta deriva pero adi-shield/wallet-guard dan allow: "
                 "ataque WebTrap que solo el ancla ve -> atención humana",
+            )
+        # matiz del usuario: si goal-anchor retractó (event=drift_retract), la
+        # correlación no queda congelada con la lectura vieja. La deriva previa
+        # fue autorizada retroactivamente por el humano -> baja a allow, pero
+        # QUEDA REGISTRO de que hubo retractación (no se oculta al auditor).
+        if ga_retracted and others_all_allow:
+            return CorrelatedVerdict(
+                "allow", "correlation:drift_retracted",
+                "goal-anchor retractó la deriva (autorización humana tardía): "
+                "correlación revisa su veredicto y baja a allow",
             )
 
     # 3. >=2 sensores en confirm simultáneo

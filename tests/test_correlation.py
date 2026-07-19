@@ -76,3 +76,32 @@ def test_no_correlation_when_one_confirm_alone():
         {"sensor": "wallet-guard", "verdict": "confirm", "mechanism": "adi_confirm"},
     ])
     assert v.verdict == "allow"
+
+
+def test_drift_retract_reviews_correlated_verdict():
+    # caso del matiz del usuario: hubo deriva (confirm) que correlacionó a
+    # confirm; luego goal-anchor retracta -> el veredicto agregado se REVISA
+    # y baja a allow, pero registra drift_retracted (no se oculta).
+    v = correlate([
+        {"sensor": "adi-shield", "verdict": "allow", "event": "tool_call",
+         "detail": "cross_boundary"},
+        {"sensor": "wallet-guard", "verdict": "allow", "event": "tool_call",
+         "detail": "budget_ok"},
+        {"sensor": "goal-anchor", "verdict": "confirm", "event": "drift",
+         "detail": "drift:alert_soft_0.5"},
+    ])
+    assert v.verdict == "confirm"
+    assert v.mechanism == "correlation:drift_despite_allows"
+    # llega la retractacion
+    v2 = correlate([
+        {"sensor": "adi-shield", "verdict": "allow", "event": "tool_call",
+         "detail": "cross_boundary"},
+        {"sensor": "wallet-guard", "verdict": "allow", "event": "tool_call",
+         "detail": "budget_ok"},
+        {"sensor": "goal-anchor", "verdict": "confirm", "event": "drift",
+         "detail": "drift:alert_soft_0.5"},
+        {"sensor": "goal-anchor", "verdict": "allow", "event": "drift_retract",
+         "detail": "drift_retract:verify:hitos=[2]"},
+    ])
+    assert v2.verdict == "allow"
+    assert v2.mechanism == "correlation:drift_retracted"

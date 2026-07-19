@@ -29,10 +29,10 @@ import pytest
 adi_shield = pytest.importorskip("adi_shield")
 goal_anchor = pytest.importorskip("goal_anchor")
 from adi_shield.bus import LocalSignalBus, Signal
+from goal_anchor.anchor import GoalAnchor, AnchorProposal
 from goal_anchor.drift import DriftMonitor
-
+from trajectory_sentinel.correlation import correlate
 from trajectory_sentinel.monitor import TrajectorySentinel
-
 
 def _adi_signal(task_id: str, verdict: str, detail: str) -> Signal:
     return Signal(sensor="adi-shield", task_id=task_id, event="tool_call",
@@ -88,3 +88,46 @@ def test_end_to_end_correlation_via_bus():
     correlated = rec.to_dict()["correlated"]
     assert correlated["verdict"] == "confirm", correlated
     assert correlated["mechanism"] == "correlation:drift_despite_allows"
+
+
+def test_end_to_end_amplification_late_retracts_and_reviews_correlation(tmp_path):
+    # Flujo real: confirm inicial -> agente reporta hito fuera de ancla
+    # (cicatriz) -> humano aprueba ampliacion TARDE -> GoalAnchor retracta la
+    # cicatriz y emite Signal(event=drift_retract) -> trajectory-sentinel
+    # REVISA su veredicto agregado (no queda congelado).
+    store_path = str(tmp_path / "store.json")
+    ga = GoalAnchor(store_path, human_secret="x")
+    anchor = ga.propose(AnchorProposal(
+        task_id="t-ret", objective="investiga vuelos",
+        subobjectives=["research_prices"],
+    ))
+    ga.confirm(anchor)  # confirm inicial
+
+    # el agente reporta un hito fuera de ancla (ampliacion no ha llegado)
+    ga.report_drift("t-ret", "iii_transitive", "verify")
+
+    bus = LocalSignalBus()
+    sentinel = TrajectorySentinel(bus)
+    # publicamos las senales al bus (el monitor se suscribe)
+    bus.publish(Signal(sensor="goal-anchor", task_id="t-ret", event="drift",
+                       verdict="confirm", detail="drift:alert_soft_0.5"))
+    bus.publish(_adi_signal("t-ret", "allow", "cross_boundary"))
+    before = sentinel.report("t-ret")
+    assert before is not None
+    before_c = before.to_dict()["correlated"]
+    assert before_c["verdict"] == "confirm", before_c  # cicatriz -> confirm
+
+    # humano aprueba ampliacion tardia -> retracta y publica drift_retract
+    res = ga.confirm_amplification("t-ret", "verify", bus=bus)
+    assert res["retraction"], res  # hubo cicatriz que retraer
+    assert "drift_retroactively_authorized" in [
+        e["event"] for e in ga.anchor_event_log("t-ret")
+    ]
+
+    # trajectory-sentinel recibe el drift_retract (emitido por confirm_amplification
+    # via bus) y revisa el veredicto agregado: ya NO es confirm (fue autorizado)
+    after = sentinel.report("t-ret")
+    assert after is not None
+    correlated = after.to_dict()["correlated"]
+    assert correlated["verdict"] == "allow", correlated
+    assert correlated["mechanism"] == "correlation:drift_retracted", correlated

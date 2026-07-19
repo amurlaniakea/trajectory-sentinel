@@ -31,11 +31,17 @@ CORRELACIÓN, no solo worst-verdict. Reglas (0-LLM, deterministas):
 - `goal-anchor` reporta deriva (mechanism contiene `drift`/`semantic`) MIENTRAS
   los demás dan `allow` → escala a `confirm` agregado (caso WebTrap que solo el
   ancla ve, p.ej. T1/T2/T4 de goal-anchor donde adi-shield/wallet-guard pasan);
-- ≥2 sensores en `confirm` simultáneo → `confirm` agregado (ambigüedad acumulada).
+- ≥2 sensores en `confirm` simultáneo → `confirm` agregado (ambigüedad acumulada);
+- `goal-anchor` emite `event="drift_retract"` (autorización humana tardía de
+  una desviación) → el veredicto agregado se **REVISA** y baja a `allow` con
+  mecanismo `correlation:drift_retracted` (no queda congelado con la lectura
+  vieja; el rastro de la retractación queda registrado, no se oculta).
 
 El `TrajectoryRecord.to_dict()` ya incluye la clave `correlated` con el
-veredicto correlacionado por tarea. Tests: `tests/test_correlation.py` (6 casos
-de correlación).
+veredicto correlacionado por tarea. Tests: `tests/test_correlation.py` (7 casos
+de correlación, incl. retractación) y `tests/test_integration_drift.py` (E2E
+bus real: DriftMonitor → Signal → TrajectorySentinel, incl. ampliación tardía
+que retracta y revisa la correlación).
 
 **Gap HONESTO que queda:** la correlación depende de que goal-anchor emita la
 señal de deriva. Hasta que la Capa 2 de goal-anchor tenga un backend semántico
