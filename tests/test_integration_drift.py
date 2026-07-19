@@ -19,8 +19,15 @@
 
 """End-to-end integration: goal-anchor DriftSignal -> bus Signal ->
 trajectory-sentinel correlation (closes the gap Claude flagged in point 4).
+
+SKIP en clone fresco sin dependencias de integración (no falla silenciosamente).
+Instalar con: pip install -e ../adi-shield && pip install -e ../goal-anchor
 """
 
+import pytest
+
+adi_shield = pytest.importorskip("adi_shield")
+goal_anchor = pytest.importorskip("goal_anchor")
 from adi_shield.bus import LocalSignalBus, Signal
 from goal_anchor.drift import DriftMonitor
 
