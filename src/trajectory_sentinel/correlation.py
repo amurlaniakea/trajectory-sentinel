@@ -72,7 +72,13 @@ def correlate(signals: list[dict]) -> CorrelatedVerdict:
 
     sensors = {s["sensor"]: s for s in signals}
     verdicts = {s["sensor"]: s.get("verdict", "allow") for s in signals}
-    mechanisms = {s["sensor"]: s.get("mechanism", "") for s in signals}
+    # El bus de adi-shield NO tiene campo 'mechanism'; usa 'event' y 'detail'.
+    # goal-anchor publica Signal(event="drift", detail="drift:soft_X"/"drift:alert").
+    # Aceptamos ambos: event == "drift" O detail conteniendo 'drift'/'semantic'.
+    def _is_drift(sig: dict) -> bool:
+        ev = sig.get("event", "")
+        det = sig.get("detail", "")
+        return (ev == "drift") or ("drift" in det) or ("semantic" in det)
 
     # 1. cualquier block/kill corta
     for s in signals:
@@ -85,8 +91,7 @@ def correlate(signals: list[dict]) -> CorrelatedVerdict:
     # 2. goal-anchor deriva mientras otros allow
     ga = sensors.get("goal-anchor")
     if ga is not None:
-        ga_mech = mechanisms.get("goal-anchor", "")
-        ga_is_drift = ("drift" in ga_mech) or ("semantic" in ga_mech)
+        ga_is_drift = _is_drift(ga)
         others = [v for k, v in verdicts.items() if k != "goal-anchor"]
         others_all_allow = others and all(v == "allow" for v in others)
         if ga_is_drift and others_all_allow:

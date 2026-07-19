@@ -38,10 +38,14 @@ def test_block_short_circuits():
 
 def test_goal_anchor_drift_while_others_allow_correlates():
     # WebTrap: goal-anchor ve deriva, los demás dan allow
+    # El bus de adi-shield usa 'event'/'detail', no 'mechanism'.
     v = correlate([
-        {"sensor": "adi-shield", "verdict": "allow", "mechanism": "cross_boundary"},
-        {"sensor": "wallet-guard", "verdict": "allow", "mechanism": "budget_ok"},
-        {"sensor": "goal-anchor", "verdict": "allow", "mechanism": "drift:soft_0.9"},
+        {"sensor": "adi-shield", "verdict": "allow", "event": "tool_call",
+         "detail": "cross_boundary"},
+        {"sensor": "wallet-guard", "verdict": "allow", "event": "tool_call",
+         "detail": "budget_ok"},
+        {"sensor": "goal-anchor", "verdict": "confirm", "event": "drift",
+         "detail": "drift:alert_soft_0.9"},
     ])
     assert v.verdict == "confirm"
     assert v.mechanism == "correlation:drift_despite_allows"
@@ -49,8 +53,9 @@ def test_goal_anchor_drift_while_others_allow_correlates():
 
 def test_goal_anchor_semantic_drift_correlates():
     v = correlate([
-        {"sensor": "adi-shield", "verdict": "allow", "mechanism": "x"},
-        {"sensor": "goal-anchor", "verdict": "allow", "mechanism": "semantic:drift_0.8"},
+        {"sensor": "adi-shield", "verdict": "allow", "event": "tool_call", "detail": "x"},
+        {"sensor": "goal-anchor", "verdict": "confirm", "event": "drift",
+         "detail": "semantic:drift_0.8"},
     ])
     assert v.verdict == "confirm"
 
