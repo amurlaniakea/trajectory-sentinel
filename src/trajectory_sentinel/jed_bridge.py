@@ -63,9 +63,7 @@ class JedTrace:
     def to_dict(self) -> dict:
         return {
             "prompts": self.prompts,
-            "events": [
-                {"tool": e.tool, "args": e.args, "result": e.result} for e in self.events
-            ],
+            "events": [{"tool": e.tool, "args": e.args, "result": e.result} for e in self.events],
         }
 
 

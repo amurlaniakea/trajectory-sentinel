@@ -36,18 +36,21 @@ from trajectory_sentinel.monitor import TrajectorySentinel
 
 
 def _adi_signal(task_id: str, verdict: str, detail: str) -> Signal:
-    return Signal(sensor="adi-shield", task_id=task_id, event="tool_call",
-                  verdict=verdict, detail=detail)
+    return Signal(
+        sensor="adi-shield", task_id=task_id, event="tool_call", verdict=verdict, detail=detail
+    )
 
 
 def _wallet_signal(task_id: str, verdict: str, detail: str) -> Signal:
-    return Signal(sensor="wallet-guard", task_id=task_id, event="tool_call",
-                  verdict=verdict, detail=detail)
+    return Signal(
+        sensor="wallet-guard", task_id=task_id, event="tool_call", verdict=verdict, detail=detail
+    )
 
 
 def test_drift_signal_publishes_to_bus_with_event_drift():
-    dm = DriftMonitor(anchor_subobjectives=["a", "b", "c"], N=10,
-                      support_threshold=0.99, drift_threshold=0.34)
+    dm = DriftMonitor(
+        anchor_subobjectives=["a", "b", "c"], N=10, support_threshold=0.99, drift_threshold=0.34
+    )
     # 2 de 4 hitos fuera de ancla -> d_k = 0.5 > 0.34 -> alert
     dm.update("i_subobjective", "a")
     dm.update("iii_transitive", "a")
@@ -72,8 +75,12 @@ def test_end_to_end_correlation_via_bus():
     bus.publish(_wallet_signal(tid, "allow", "budget_ok"))
 
     # goal-anchor: deriva (claimed fuera de ancla en paso 4 de T3-like)
-    dm = DriftMonitor(anchor_subobjectives=["research_prices", "compare_options", "report_summary"],
-                      N=10, support_threshold=0.99, drift_threshold=0.34)
+    dm = DriftMonitor(
+        anchor_subobjectives=["research_prices", "compare_options", "report_summary"],
+        N=10,
+        support_threshold=0.99,
+        drift_threshold=0.34,
+    )
     for step in [
         ("i_subobjective", "research_prices"),
         ("iii_transitive", "research_prices"),
@@ -98,10 +105,13 @@ def test_end_to_end_amplification_late_retracts_and_reviews_correlation(tmp_path
     # REVISA su veredicto agregado (no queda congelado).
     store_path = str(tmp_path / "store.json")
     ga = GoalAnchor(store_path, human_secret="x")
-    anchor = ga.propose(AnchorProposal(
-        task_id="t-ret", objective="investiga vuelos",
-        subobjectives=["research_prices"],
-    ))
+    anchor = ga.propose(
+        AnchorProposal(
+            task_id="t-ret",
+            objective="investiga vuelos",
+            subobjectives=["research_prices"],
+        )
+    )
     ga.confirm(anchor)  # confirm inicial
 
     # el agente reporta un hito fuera de ancla (ampliacion no ha llegado)
@@ -127,9 +137,7 @@ def test_end_to_end_amplification_late_retracts_and_reviews_correlation(tmp_path
     # humano aprueba ampliacion tardia -> retracta y publica drift_retract
     res = ga.confirm_amplification("t-ret", "verify", bus=bus)
     assert res["retraction"], res  # hubo cicatriz que retraer
-    assert "drift_retroactively_authorized" in [
-        e["event"] for e in ga.anchor_event_log("t-ret")
-    ]
+    assert "drift_retroactively_authorized" in [e["event"] for e in ga.anchor_event_log("t-ret")]
 
     # trajectory-sentinel recibe el drift_retract (emitido por confirm_amplification
     # via bus) y revisa el veredicto agregado: ya NO es confirm (fue autorizado)
