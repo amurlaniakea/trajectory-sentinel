@@ -8,10 +8,27 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          # Historial completo para que gitleaks-action pueda escanear el
+          # diff del push sin fallar por "unknown revision" (shallow clone).
+          fetch-depth: 0
       - uses: actions/setup-python@v5
         with:
           python-version: "3.11"
-      - run: pip install ruff pytest bandit
+      - name: Install dependencies (sensores del ecosistema + dev tools)
+        run: |
+          pip install --upgrade pip
+          pip install ruff pytest bandit
+          # Los sensores se instalan desde GitHub (main) porque aun no
+          # estan en PyPI. Son repos PUBLICOS, asi que el checkout los clona.
+          # IMPORTANTE: goal-anchor debe instalarse desde su rama main (no
+          # scaffold/), que es donde DriftSignal.subobjective se emite como
+          # ':sub=' en la senal de deriva (requisito de la retractacion
+          # selectiva por sub-objetivo en correlation.py).
+          pip install \
+            "git+https://github.com/amurlaniakea/adi-shield.git@main" \
+            "git+https://github.com/amurlaniakea/goal-anchor.git@main"
+          pip install -e .
       - run: ruff check .
       - run: ruff format --check .
       - run: pytest
@@ -19,4 +36,5 @@ jobs:
       - name: gitleaks (secret scan)
         uses: gitleaks/gitleaks-action@v2
         env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GITLEAKS_ENABLE_UPLOAD_ARTIFACT: "false"
