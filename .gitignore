@@ -21,3 +21,4 @@ dist/
 
 # CI outputs
 .gitleaks/
+.venv_fix/

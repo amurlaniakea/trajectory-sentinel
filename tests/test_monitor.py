@@ -25,8 +25,14 @@ from trajectory_sentinel.monitor import SEVERITY, TrajectorySentinel
 
 
 def _sig(sensor: str, task_id: str, verdict: str) -> Signal:
-    return Signal(sensor=sensor, task_id=task_id, event="tool_call",
-                  verdict=verdict, scope_in=True, confidence=0.9)
+    return Signal(
+        sensor=sensor,
+        task_id=task_id,
+        event="tool_call",
+        verdict=verdict,
+        scope_in=True,
+        confidence=0.9,
+    )
 
 
 def test_worst_verdict_not_averaged():

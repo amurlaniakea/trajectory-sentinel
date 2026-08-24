@@ -56,7 +56,8 @@ class TrajectoryRecord:
             "per_sensor": self.per_sensor,
             "signal_count": len(self.signals),
             "correlated": correlate([s.to_dict() for s in self.signals]).to_dict()
-            if self.signals else None,
+            if self.signals
+            else None,
             "signals": [s.to_dict() for s in self.signals],
         }
 

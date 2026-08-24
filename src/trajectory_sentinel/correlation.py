@@ -98,6 +98,7 @@ def correlate(signals: list[dict]) -> CorrelatedVerdict:
         return CorrelatedVerdict("allow", "no_signals", "sin señales que correlar")
 
     verdicts = {s["sensor"]: s.get("verdict", "allow") for s in signals}
+
     # El bus de adi-shield NO tiene campo 'mechanism'; usa 'event' y 'detail'.
     # goal-anchor publica Signal(event="drift", detail="drift:soft_X"/"drift:alert").
     # La deriva se detecta ESTRICTAMENTE por event == "drift" (no por substring
@@ -112,7 +113,8 @@ def correlate(signals: list[dict]) -> CorrelatedVerdict:
     for s in signals:
         if SEVERITY.get(s.get("verdict", "allow"), 0) >= SEVERITY["block"]:
             return CorrelatedVerdict(
-                "block", f"hard_{s['sensor']}_block",
+                "block",
+                f"hard_{s['sensor']}_block",
                 f"{s['sensor']} bloqueó; correlación no anula block",
             )
 
@@ -169,7 +171,8 @@ def correlate(signals: list[dict]) -> CorrelatedVerdict:
     confirming = [k for k, v in verdicts.items() if v == "confirm"]
     if len(confirming) >= 2:
         return CorrelatedVerdict(
-            "confirm", "correlation:multi_confirm",
+            "confirm",
+            "correlation:multi_confirm",
             f"múltiples sensores ({confirming}) en confirm simultáneo",
         )
 

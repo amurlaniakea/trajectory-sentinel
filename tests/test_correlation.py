@@ -28,10 +28,12 @@ def test_single_allow_is_allow():
 
 
 def test_block_short_circuits():
-    v = correlate([
-        {"sensor": "adi-shield", "verdict": "allow", "mechanism": "x"},
-        {"sensor": "wallet-guard", "verdict": "block", "mechanism": "budget"},
-    ])
+    v = correlate(
+        [
+            {"sensor": "adi-shield", "verdict": "allow", "mechanism": "x"},
+            {"sensor": "wallet-guard", "verdict": "block", "mechanism": "budget"},
+        ]
+    )
     assert v.verdict == "block"
     assert "wallet-guard" in v.mechanism
 
@@ -39,42 +41,66 @@ def test_block_short_circuits():
 def test_goal_anchor_drift_while_others_allow_correlates():
     # WebTrap: goal-anchor ve deriva, los demás dan allow
     # El bus de adi-shield usa 'event'/'detail', no 'mechanism'.
-    v = correlate([
-        {"sensor": "adi-shield", "verdict": "allow", "event": "tool_call",
-         "detail": "cross_boundary"},
-        {"sensor": "wallet-guard", "verdict": "allow", "event": "tool_call",
-         "detail": "budget_ok"},
-        {"sensor": "goal-anchor", "verdict": "confirm", "event": "drift",
-         "detail": "drift:alert_soft_0.9"},
-    ])
+    v = correlate(
+        [
+            {
+                "sensor": "adi-shield",
+                "verdict": "allow",
+                "event": "tool_call",
+                "detail": "cross_boundary",
+            },
+            {
+                "sensor": "wallet-guard",
+                "verdict": "allow",
+                "event": "tool_call",
+                "detail": "budget_ok",
+            },
+            {
+                "sensor": "goal-anchor",
+                "verdict": "confirm",
+                "event": "drift",
+                "detail": "drift:alert_soft_0.9",
+            },
+        ]
+    )
     assert v.verdict == "confirm"
     assert v.mechanism == "correlation:drift_despite_allows"
 
 
 def test_goal_anchor_semantic_drift_correlates():
-    v = correlate([
-        {"sensor": "adi-shield", "verdict": "allow", "event": "tool_call", "detail": "x"},
-        {"sensor": "goal-anchor", "verdict": "confirm", "event": "drift",
-         "detail": "semantic:drift_0.8"},
-    ])
+    v = correlate(
+        [
+            {"sensor": "adi-shield", "verdict": "allow", "event": "tool_call", "detail": "x"},
+            {
+                "sensor": "goal-anchor",
+                "verdict": "confirm",
+                "event": "drift",
+                "detail": "semantic:drift_0.8",
+            },
+        ]
+    )
     assert v.verdict == "confirm"
 
 
 def test_multi_confirm_correlates():
-    v = correlate([
-        {"sensor": "adi-shield", "verdict": "confirm", "mechanism": "instruction_from_data"},
-        {"sensor": "wallet-guard", "verdict": "confirm", "mechanism": "adi_confirm"},
-    ])
+    v = correlate(
+        [
+            {"sensor": "adi-shield", "verdict": "confirm", "mechanism": "instruction_from_data"},
+            {"sensor": "wallet-guard", "verdict": "confirm", "mechanism": "adi_confirm"},
+        ]
+    )
     assert v.verdict == "confirm"
     assert v.mechanism == "correlation:multi_confirm"
 
 
 def test_no_correlation_when_one_confirm_alone():
     # un solo confirm sin deriva ni otro confirm -> allow
-    v = correlate([
-        {"sensor": "adi-shield", "verdict": "allow", "mechanism": "x"},
-        {"sensor": "wallet-guard", "verdict": "confirm", "mechanism": "adi_confirm"},
-    ])
+    v = correlate(
+        [
+            {"sensor": "adi-shield", "verdict": "allow", "mechanism": "x"},
+            {"sensor": "wallet-guard", "verdict": "confirm", "mechanism": "adi_confirm"},
+        ]
+    )
     assert v.verdict == "allow"
 
 
@@ -82,27 +108,59 @@ def test_drift_retract_reviews_correlated_verdict():
     # caso del matiz del usuario: hubo deriva (confirm) que correlacionó a
     # confirm; luego goal-anchor retracta -> el veredicto agregado se REVISA
     # y baja a allow, pero registra drift_retracted (no se oculta).
-    v = correlate([
-        {"sensor": "adi-shield", "verdict": "allow", "event": "tool_call",
-         "detail": "cross_boundary"},
-        {"sensor": "wallet-guard", "verdict": "allow", "event": "tool_call",
-         "detail": "budget_ok"},
-        {"sensor": "goal-anchor", "verdict": "confirm", "event": "drift",
-         "detail": "drift:alert_soft_0.5"},
-    ])
+    v = correlate(
+        [
+            {
+                "sensor": "adi-shield",
+                "verdict": "allow",
+                "event": "tool_call",
+                "detail": "cross_boundary",
+            },
+            {
+                "sensor": "wallet-guard",
+                "verdict": "allow",
+                "event": "tool_call",
+                "detail": "budget_ok",
+            },
+            {
+                "sensor": "goal-anchor",
+                "verdict": "confirm",
+                "event": "drift",
+                "detail": "drift:alert_soft_0.5",
+            },
+        ]
+    )
     assert v.verdict == "confirm"
     assert v.mechanism == "correlation:drift_despite_allows"
     # llega la retractacion del sub 'verify'
-    v2 = correlate([
-        {"sensor": "adi-shield", "verdict": "allow", "event": "tool_call",
-         "detail": "cross_boundary"},
-        {"sensor": "wallet-guard", "verdict": "allow", "event": "tool_call",
-         "detail": "budget_ok"},
-        {"sensor": "goal-anchor", "verdict": "confirm", "event": "drift",
-         "detail": "drift:alert_soft_0.5:sub=verify"},
-        {"sensor": "goal-anchor", "verdict": "allow", "event": "drift_retract",
-         "detail": "retract:drift:verify:hitos=[2]"},
-    ])
+    v2 = correlate(
+        [
+            {
+                "sensor": "adi-shield",
+                "verdict": "allow",
+                "event": "tool_call",
+                "detail": "cross_boundary",
+            },
+            {
+                "sensor": "wallet-guard",
+                "verdict": "allow",
+                "event": "tool_call",
+                "detail": "budget_ok",
+            },
+            {
+                "sensor": "goal-anchor",
+                "verdict": "confirm",
+                "event": "drift",
+                "detail": "drift:alert_soft_0.5:sub=verify",
+            },
+            {
+                "sensor": "goal-anchor",
+                "verdict": "allow",
+                "event": "drift_retract",
+                "detail": "retract:drift:verify:hitos=[2]",
+            },
+        ]
+    )
     assert v2.verdict == "allow"
     assert v2.mechanism == "correlation:drift_retracted"
 
@@ -110,25 +168,43 @@ def test_drift_retract_reviews_correlated_verdict():
 def test_drift_retract_selective_by_subobjective():
     # Dos subs en deriva; solo UNO se retracta -> la tarea sigue en confirm
     # (la deriva del sub NO retractado persiste). P5.
-    v = correlate([
-        {"sensor": "adi-shield", "verdict": "allow", "event": "tool_call",
-         "detail": "cross_boundary"},
-        {"sensor": "wallet-guard", "verdict": "allow", "event": "tool_call",
-         "detail": "budget_ok"},
-        {"sensor": "goal-anchor", "verdict": "confirm", "event": "drift",
-         "detail": "drift:alert_soft_0.6:sub=pay_attacker"},
-        {"sensor": "goal-anchor", "verdict": "allow", "event": "drift_retract",
-         "detail": "retract:drift:verify:hitos=[2]"},
-    ])
+    v = correlate(
+        [
+            {
+                "sensor": "adi-shield",
+                "verdict": "allow",
+                "event": "tool_call",
+                "detail": "cross_boundary",
+            },
+            {
+                "sensor": "wallet-guard",
+                "verdict": "allow",
+                "event": "tool_call",
+                "detail": "budget_ok",
+            },
+            {
+                "sensor": "goal-anchor",
+                "verdict": "confirm",
+                "event": "drift",
+                "detail": "drift:alert_soft_0.6:sub=pay_attacker",
+            },
+            {
+                "sensor": "goal-anchor",
+                "verdict": "allow",
+                "event": "drift_retract",
+                "detail": "retract:drift:verify:hitos=[2]",
+            },
+        ]
+    )
     assert v.verdict == "confirm"
     assert v.mechanism == "correlation:drift_despite_allows"
-
 
 
 def test_sensor_calibration_identity_by_default():
     # P2 (SDD R4): calibración por sensor. Sin curva -> identidad (no cambia
     # el score). Con curva -> normaliza. Evita promedio naïf entre sensores.
     from trajectory_sentinel.correlation import SensorCalibration
+
     cal = SensorCalibration()
     assert cal.calibrate("adi-shield", 0.7) == 0.7
     assert cal.calibrate("goal-anchor", 1.4) == 1.0  # clamp a [0,1]
