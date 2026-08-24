@@ -117,44 +117,52 @@ def correlate(signals: list[dict]) -> CorrelatedVerdict:
             )
 
     # 2. goal-anchor deriva mientras otros allow
-    # P5: puede haber DOS señales de goal-anchor (drift + drift_retract).
-    # Usamos la señal de DRIFT específica (event=="drift"), no la última del
-    # dict colapsado, para no perder la deriva cuando también hay retract.
+    # P5: retractacion SELECTIVA por sub-objetivo. Puede haber varias senales
+    # de deriva (una por sub) y varias de retract (una por sub). Consideramos
+    # TODAS las derivas activas, no solo la primera: el veredicto agregado
+    # baja a allow SOLO si TODAS las derivas de la tarea fueron retractadas;
+    # si queda CUALQUIER sub con deriva sin autorizar, sigue en confirm
+    # (no retractamos de mas ni ignoramos derivas distintas de la primera).
     ga_signals = [s for s in signals if s.get("sensor") == "goal-anchor"]
-    ga = next((s for s in ga_signals if s.get("event") == "drift"), None)
-    # Subs retractados por autorización humana tardía (P5): retractación
-    # SELECTIVA por sub-objetivo, no por tarea completa.
+    drift_sigs = [s for s in ga_signals if s.get("event") == "drift"]
+    # Subs con deriva activa (del :sub= en el detail de cada senal de drift).
+    drift_subs = set()
+    for s in drift_sigs:
+        gm = re.search(r":sub=([^:\s]+)", s.get("detail", ""))
+        if gm:
+            drift_subs.add(gm.group(1))
+        else:
+            # deriva sin sub conocido: se trata como sub unico no retractable
+            drift_subs.add("")
+    # Subs retractados por autorizacion humana tardia (P5).
+    # formato: retract:drift:<sub>:hitos=[...]
     retracted_subs = set()
-    for sig in ga_signals:
-        if sig.get("event") == "drift_retract":
-            det = sig.get("detail", "")
-            # formato: retract:drift:<sub>:hitos=[...]
-            m = re.search(r"retract:drift:([^:]+):", det)
+    for s in ga_signals:
+        if s.get("event") == "drift_retract":
+            m = re.search(r"retract:drift:([^:]+):", s.get("detail", ""))
             if m:
                 retracted_subs.add(m.group(1))
-    if ga is not None:
-        ga_is_drift = _is_drift(ga)
+    if drift_sigs:
         others = [v for k, v in verdicts.items() if k != "goal-anchor"]
         others_all_allow = others and all(v == "allow" for v in others)
-        # sub que derivó (del detail de la señal de deriva)
-        drift_sub = ""
-        gm = re.search(r":sub=([^:\s]+)", ga.get("detail", ""))
-        if gm:
-            drift_sub = gm.group(1)
-        if ga_is_drift and others_all_allow:
-            if drift_sub and drift_sub in retracted_subs:
-                # solo este sub fue autorizado retroactivamente -> la deriva
-                # de ESTE sub se perdona, pero QUEDA REGISTRO (no se oculta).
+        if others_all_allow:
+            active = drift_subs - retracted_subs
+            if not active:
+                # TODAS las derivas de la tarea fueron autorizadas
+                # retroactivamente -> la correlacion revisa y baja a allow.
+                # QUEDA REGISTRO de las retractaciones (no se ocultan).
                 return CorrelatedVerdict(
-                    "allow", "correlation:drift_retracted",
-                    f"goal-anchor retractó la deriva del sub '{drift_sub}' "
-                    f"(autorización humana tardía): correlación revisa y baja a allow",
+                    "allow",
+                    "correlation:drift_retracted",
+                    "goal-anchor retracto TODAS las derivas de la tarea "
+                    "(autorizacion humana tardia): correlacion revisa y baja a allow",
                 )
-            # deriva de un sub NO retractado (o sin sub conocido) -> confirm
+            # queda >=1 sub con deriva activa sin autorizar -> confirm
             return CorrelatedVerdict(
-                "confirm", "correlation:drift_despite_allows",
+                "confirm",
+                "correlation:drift_despite_allows",
                 "goal-anchor detecta deriva pero adi-shield/wallet-guard dan allow: "
-                "ataque WebTrap que solo el ancla ve -> atención humana",
+                "ataque WebTrap que solo el ancla ve -> atencion humana",
             )
 
     # 3. >=2 sensores en confirm simultáneo
